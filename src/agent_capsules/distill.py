@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import List, Optional
 
 from agent_capsules.models import Capsule, Gene
 from agent_capsules.store import CapsuleStore
@@ -17,20 +16,20 @@ class GeneDistiller:
         self.store = store
         self.min_cluster_size = min_cluster_size
 
-    def distill(self) -> List[Gene]:
+    def distill(self) -> list[Gene]:
         """Find clusters of unconsumed capsules and propose genes."""
         capsules = self.store.load_unconsumed()
         if len(capsules) < self.min_cluster_size:
             return []
 
         # Cluster by tag
-        by_tag = defaultdict(list)
+        by_tag: dict[str, list[Capsule]] = defaultdict(list)
         for cap in capsules:
             for tag in cap.tags:
                 by_tag[tag].append(cap)
 
-        genes = []
-        consumed_sessions = set()
+        genes: list[Gene] = []
+        consumed_sessions: set[str] = set()
 
         for tag, caps in by_tag.items():
             if len(caps) < self.min_cluster_size:
@@ -48,7 +47,7 @@ class GeneDistiller:
 
             gene = Gene(
                 name=f"{tag}-pitfalls",
-                content="\n".join(f"- {l}" for l in lessons),
+                content="\n".join(f"- {lesson}" for lesson in lessons),
                 tags=[tag],
                 source_capsules=[c.session_id for c in available],
                 created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -59,7 +58,7 @@ class GeneDistiller:
 
         return genes
 
-    def apply(self, genes: List[Gene]) -> None:
+    def apply(self, genes: list[Gene]) -> None:
         """Mark source capsules as consumed after genes are created."""
         for gene in genes:
             self.store.mark_consumed(gene.source_capsules, gene.name)

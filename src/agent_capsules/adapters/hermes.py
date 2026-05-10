@@ -6,14 +6,13 @@ import logging
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from agent_capsules.extract import extract_capsules
 from agent_capsules.store import CapsuleStore
 
 logger = logging.getLogger(__name__)
 
-# Configurable thresholds
 MIN_TOOL_CALLS = 5
 STATE_DB = Path.home() / ".hermes" / "state.db"
 
@@ -35,7 +34,7 @@ def _get_session_tool_count(session_id: str) -> int:
         return 0
 
 
-def _get_messages(session_id: str) -> List[Dict[str, Any]]:
+def _get_messages(session_id: str) -> list[dict[str, Any]]:
     """Read messages from Hermes state.db."""
     if not STATE_DB.exists():
         return []
@@ -79,8 +78,7 @@ def _on_session_end(session_id: str = "", **kwargs) -> None:
         return
 
     # Non-blocking extraction
-    t = threading.Thread(target=_do_extract, args=(session_id,), daemon=True)
-    t.start()
+    threading.Thread(target=_do_extract, args=(session_id,), daemon=True).start()
 
 
 def register(ctx) -> None:

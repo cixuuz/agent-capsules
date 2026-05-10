@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from agent_capsules.models import Capsule
 
 
-_EXTRACTION_PROMPT = """Analyze this AI agent session and extract a learning capsule if one exists.
+_EXTRACTION_PROMPT = """\
+Analyze this AI agent session and extract a learning capsule if one exists.
 
 A learning capsule captures: what went wrong or was discovered, what was tried, and what was learned.
 
@@ -39,16 +40,15 @@ Session transcript:
 class LLMExtractor:
     """Extract capsules using an LLM for deeper analysis."""
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
 
     def extract(
-        self, messages: List[Dict[str, Any]], session_id: str = ""
-    ) -> List[Capsule]:
+        self, messages: list[dict[str, Any]], session_id: str = ""
+    ) -> list[Capsule]:
         """Use LLM to analyze session and extract capsule."""
-        # Build transcript (truncated for token efficiency)
         transcript_parts = []
-        for msg in messages[-40:]:  # Last 40 messages max
+        for msg in messages[-40:]:
             role = msg.get("role", "")
             content = msg.get("content", "")
             if isinstance(content, list):
@@ -72,18 +72,17 @@ class LLMExtractor:
 
         # Parse response
         try:
-            # Try to find JSON in the response
             text = response
             if "```" in text:
                 text = text.split("```")[1]
                 if text.startswith("json"):
                     text = text[4:]
-            
+
             data = json.loads(text.strip())
             if not data:
                 return []
 
-            capsule = Capsule.now(
+            return [Capsule.now(
                 session_id=session_id or "unknown",
                 signal=data.get("signal", ""),
                 hypothesis=data.get("hypothesis", ""),
@@ -93,8 +92,7 @@ class LLMExtractor:
                 tags=data.get("tags", []),
                 confidence=data.get("confidence", "medium"),
                 extraction="llm",
-            )
-            return [capsule]
+            )]
         except (json.JSONDecodeError, TypeError, KeyError):
             return []
 

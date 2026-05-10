@@ -7,7 +7,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/agent-capsules)](https://pypi.org/project/agent-capsules/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 </div>
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Optional, Set
 
 from agent_capsules.models import Capsule
 
@@ -15,13 +14,13 @@ DEFAULT_STORE_PATH = Path.home() / ".agent-capsules" / "index.jsonl"
 class CapsuleStore:
     """Append-only JSONL capsule store with session dedup."""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path | str | None = None):
         self.path = Path(path) if path else DEFAULT_STORE_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._session_ids: Optional[Set[str]] = None
+        self._session_ids: set[str] | None = None
 
     @property
-    def session_ids(self) -> Set[str]:
+    def session_ids(self) -> set[str]:
         """Lazily load known session IDs for dedup."""
         if self._session_ids is None:
             self._session_ids = set()
@@ -47,15 +46,11 @@ class CapsuleStore:
         self.session_ids.add(capsule.session_id)
         return True
 
-    def append_many(self, capsules: List[Capsule]) -> int:
+    def append_many(self, capsules: list[Capsule]) -> int:
         """Append multiple capsules. Returns count of new ones added."""
-        added = 0
-        for c in capsules:
-            if self.append(c):
-                added += 1
-        return added
+        return sum(1 for c in capsules if self.append(c))
 
-    def load_all(self) -> List[Capsule]:
+    def load_all(self) -> list[Capsule]:
         """Load all capsules."""
         if not self.path.exists():
             return []
@@ -68,18 +63,15 @@ class CapsuleStore:
                     pass
         return capsules
 
-    def load_unconsumed(self) -> List[Capsule]:
+    def load_unconsumed(self) -> list[Capsule]:
         """Load capsules not yet absorbed into a gene."""
         return [c for c in self.load_all() if not c.skill_absorbed]
 
-    def mark_consumed(self, session_ids: List[str], gene_name: str) -> None:
-        """Mark capsules as consumed by rewriting the store.
-        
-        Note: This rewrites the full file. For large stores, consider
-        using a separate consumed.jsonl index instead.
-        """
+    def mark_consumed(self, session_ids: list[str], gene_name: str) -> None:
+        """Mark capsules as consumed by rewriting the store."""
         if not self.path.exists():
             return
+        target_ids = set(session_ids)
         lines = self.path.read_text().strip().split("\n")
         new_lines = []
         for line in lines:
@@ -87,7 +79,7 @@ class CapsuleStore:
                 continue
             try:
                 data = json.loads(line)
-                if data.get("session_id") in session_ids:
+                if data.get("session_id") in target_ids:
                     data["skill_absorbed"] = gene_name
                 new_lines.append(json.dumps(data, ensure_ascii=False))
             except Exception:

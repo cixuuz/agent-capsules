@@ -3,31 +3,33 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 from agent_capsules.models import Capsule
 
 
 # Error signal patterns
-_ERROR_KEYWORDS = [
+_ERROR_KEYWORDS = frozenset([
     "Error", "Traceback", "FAILED", "failed", "exit_code\": 1",
     "permission denied", "not found", "timeout", "ConnectionError",
     "ModuleNotFoundError", "ImportError", "FileNotFoundError",
     "command not found", "ENOENT", "EACCES", "404", "500",
-]
+])
 
-# User correction patterns (English + Chinese)
+# User correction patterns (English + Chinese + Japanese + Korean)
 _CORRECTION_PATTERNS = [
     re.compile(r"\b(no,?\s|not that|wrong|actually|instead|should be|don't|stop)", re.I),
     re.compile(r"(不对|不是|别这样|换一个|不要|错了|重来|改一下|不行)"),
+    re.compile(r"(違う|ちがう|やめて|そうじゃない)"),
+    re.compile(r"(아니|틀렸|그게 아니라)"),
 ]
 
 # Tag detection keywords
-_TAG_KEYWORDS: Dict[str, List[str]] = {
+_TAG_KEYWORDS: dict[str, list[str]] = {
     "git": ["git ", "commit", "branch", "merge", "clone", "push", "pull", "rebase"],
     "pip": ["pip ", "install", "package", "venv", "requirements"],
     "docker": ["docker", "container", "image", "compose"],
-    "npm": ["npm ", "node_modules", "package.json", "yarn"],
+    "npm": ["npm ", "node_modules", "package.json", "yarn", "pnpm"],
     "config": ["config", "yaml", "toml", "settings", ".env"],
     "auth": ["token", "credential", "auth", "login", "permission"],
     "network": ["curl", "http", "api", "request", "timeout", "dns"],
@@ -36,6 +38,8 @@ _TAG_KEYWORDS: Dict[str, List[str]] = {
     "deploy": ["deploy", "ci/cd", "pipeline", "build", "release"],
     "llm": ["openai", "anthropic", "claude", "gpt", "bedrock", "model"],
     "memory": ["memory", "context", "token limit", "truncat"],
+    "rust": ["cargo", "rustc", "crate", ".rs"],
+    "go": ["go build", "go run", "go mod", ".go"],
 }
 
 
@@ -43,16 +47,16 @@ class HeuristicExtractor:
     """Extract capsules using pattern matching — no LLM needed."""
 
     def extract(
-        self, messages: List[Dict[str, Any]], session_id: str = ""
-    ) -> List[Capsule]:
+        self, messages: list[dict[str, Any]], session_id: str = ""
+    ) -> list[Capsule]:
         """Analyze messages for error→fix patterns and user corrections."""
         if not messages:
             return []
 
-        errors: List[str] = []
-        corrections: List[str] = []
+        errors: list[str] = []
+        corrections: list[str] = []
         title = ""
-        all_text_parts: List[str] = []
+        all_text_parts: list[str] = []
 
         for i, msg in enumerate(messages):
             role = msg.get("role", "")
@@ -80,10 +84,11 @@ class HeuristicExtractor:
             return []
 
         # Build signal
-        if errors:
-            signal = f"Encountered {len(errors)} error(s). First: {errors[0][:150]}"
-        else:
-            signal = f"User corrected: {corrections[0][:150]}"
+        signal = (
+            f"Encountered {len(errors)} error(s). First: {errors[0][:150]}"
+            if errors
+            else f"User corrected: {corrections[0][:150]}"
+        )
 
         # Detect tags
         all_text = " ".join(all_text_parts).lower()
@@ -104,15 +109,17 @@ class HeuristicExtractor:
         )
         return [capsule]
 
-    def _get_text(self, msg: Dict[str, Any]) -> str:
+    def _get_text(self, msg: dict[str, Any]) -> str:
         """Extract text from a message (handles string or list content)."""
         content = msg.get("content", "")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            parts = []
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    parts.append(block.get("text", ""))
-            return " ".join(parts)
-        return ""
+        match content:
+            case str():
+                return content
+            case list():
+                return " ".join(
+                    block.get("text", "")
+                    for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                )
+            case _:
+                return ""
