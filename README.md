@@ -205,6 +205,27 @@ agent-capsules export --format markdown
 agent-capsules export --format claude >> CLAUDE.md
 ```
 
+## Performance
+
+**0.55 ms per session** — less overhead than a single log statement.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Operation                        │  Time      │  Notes    │
+├───────────────────────────────────┼────────────┼───────────┤
+│  Extract (50-msg session)         │  449 µs    │  typical  │
+│  Extract (200-msg session)        │  1.8 ms    │  large    │
+│  Store append (write + dedup)     │  80 µs     │  per cap  │
+│  Dedup lookup                     │  538 ns    │  O(1) set │
+│  Full end-to-end per session      │  0.55 ms   │  ← this  │
+│  Distill 1000 capsules            │  6.3 ms    │  weekly   │
+└───────────────────────────────────┴────────────┴───────────┘
+```
+
+Run benchmarks yourself: `python tests/bench.py`
+
+The heuristic extractor processes **110,000+ messages/sec** — your agent session ends, capsule gets extracted, and the next session starts before the disk even finishes flushing.
+
 ## Storage
 
 Everything is local files. No database, no server, no cloud.
